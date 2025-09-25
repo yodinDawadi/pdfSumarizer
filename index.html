@@ -83,10 +83,6 @@
         let file = null;
         const MAX_FILE_SIZE_MB = 5;
 
-        // API configuration
-        const apiKey = "";
-        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
-
         // Utility function to show a custom message box
         function showMessageBox(message) {
             messageText.textContent = message;
@@ -186,36 +182,18 @@
             });
         }
 
-        // Function to call the LLM API for summarization
+        // Function to call the LLM API for summarization via a serverless function
         async function getSummaryFromLLM(text) {
-            const payload = {
-                contents: [{
-                    parts: [{
-                        text: `Please provide a concise and well-structured summary of the following text:\n\n${text}`
-                    }]
-                }]
-            };
-
             let response;
             try {
-                // Using exponential backoff for API calls
-                let delay = 1000;
-                for (let i = 0; i < 3; i++) {
-                    try {
-                        response = await fetch(apiUrl, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(payload)
-                        });
-                        if (response.ok) break;
-                    } catch (e) {
-                        console.error(`Attempt ${i + 1} failed, retrying...`, e);
-                    }
-                    await new Promise(res => setTimeout(res, delay));
-                    delay *= 2;
-                }
-                if (!response || !response.ok) {
-                    throw new Error('API call failed after multiple retries.');
+                response = await fetch('/api/summarize', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Serverless function failed with status: ${response.status}`);
                 }
             } catch (error) {
                 console.error('API call failed:', error);
@@ -223,7 +201,7 @@
             }
 
             const result = await response.json();
-            const summary = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+            const summary = result?.summary;
 
             if (!summary) {
                 throw new Error('Summary not found in API response.');
