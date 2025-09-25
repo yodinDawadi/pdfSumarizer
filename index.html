@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PDF Summarizer</title>
+    <title>PDF Summarizer & Translator</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');
@@ -23,8 +23,20 @@
 <body class="flex items-center justify-center min-h-screen p-4">
 
     <div class="container bg-white p-8 rounded-2xl shadow-lg w-full">
-        <h1 class="text-3xl font-bold text-center text-gray-800 mb-6">PDF Summarizer</h1>
-        <p class="text-center text-gray-500 mb-8">Select a PDF file to generate a concise summary of its content.</p>
+        <h1 class="text-3xl font-bold text-center text-gray-800 mb-6">PDF Sankshepikaran & Anubad</h1>
+        <p class="text-center text-gray-500 mb-8">Sankshepikaran garna athawa Nepali ma anubad garna PDF file chhanot garnuhos.</p>
+
+        <!-- Task Selection Section -->
+        <div class="mb-6 flex justify-center space-x-4">
+            <div class="flex items-center">
+                <input id="task-summarize" type="radio" name="task" value="summarize" class="form-radio text-blue-600 h-4 w-4" checked>
+                <label for="task-summarize" class="ml-2 text-sm text-gray-700">Sankshepikaran Garnuhos</label>
+            </div>
+            <div class="flex items-center">
+                <input id="task-translate" type="radio" name="task" value="translate" class="form-radio text-blue-600 h-4 w-4">
+                <label for="task-translate" class="ml-2 text-sm text-gray-700">Nepali ma Anubad Garnuhos</label>
+            </div>
+        </div>
 
         <!-- File Upload Section -->
         <div class="flex items-center justify-center w-full mb-6">
@@ -33,8 +45,8 @@
                     <svg class="w-8 h-8 mb-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-4-4v-1a4 4 0 014-4h10a4 4 0 014 4v1a4 4 0 01-4 4M12 16v-6m-3 3l3-3m0 0l3 3"></path>
                     </svg>
-                    <p class="mb-2 text-sm text-gray-500"><span class="font-semibold">Click to upload</span> or drag and drop</p>
-                    <p class="text-xs text-gray-500">Only PDF files (Max 5MB)</p>
+                    <p class="mb-2 text-sm text-gray-500"><span class="font-semibold">Upload Garna Click Garnuhos</span> athawa drag gari chhodnuhos</p>
+                    <p class="text-xs text-gray-500">PDF file matra (Sarvadhik 5MB)</p>
                 </div>
                 <input id="pdf-upload" type="file" class="hidden" accept=".pdf" />
             </label>
@@ -43,22 +55,22 @@
         <div id="file-name" class="text-center text-sm text-gray-600 mb-4 hidden"></div>
 
         <!-- Action Button and Status -->
-        <button id="summarize-button" class="w-full py-3 bg-blue-600 text-white font-medium rounded-xl shadow-md hover:bg-blue-700 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed">
-            Summarize PDF
+        <button id="action-button" class="w-full py-3 bg-blue-600 text-white font-medium rounded-xl shadow-md hover:bg-blue-700 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed">
+            PDF Sankshepikaran Garnuhos
         </button>
 
         <div id="status-message" class="text-center mt-4 text-sm text-gray-700"></div>
 
-        <!-- Summary Display Section -->
-        <div id="summary-card" class="mt-8 p-6 bg-gray-50 rounded-xl hidden">
-            <h3 class="text-lg font-semibold text-gray-800 mb-2">Summary:</h3>
-            <div id="summary-content" class="text-gray-700 leading-relaxed summary-container"></div>
+        <!-- Result Display Section -->
+        <div id="result-card" class="mt-8 p-6 bg-gray-50 rounded-xl hidden">
+            <h3 id="result-title" class="text-lg font-semibold text-gray-800 mb-2">Parinam:</h3>
+            <div id="result-content" class="text-gray-700 leading-relaxed summary-container"></div>
         </div>
 
         <!-- Custom Message Box -->
         <div id="message-box" class="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white p-6 rounded-2xl shadow-xl border border-gray-200 z-50 transition-opacity duration-300 hidden">
             <div id="message-text" class="text-center text-gray-800 font-medium"></div>
-            <button onclick="closeMessageBox()" class="mt-4 w-full py-2 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 transition-colors duration-200">OK</button>
+            <button onclick="closeMessageBox()" class="mt-4 w-full py-2 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 transition-colors duration-200">Thik chha</button>
         </div>
 
     </div>
@@ -71,16 +83,20 @@
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
         const fileInput = document.getElementById('pdf-upload');
-        const summarizeButton = document.getElementById('summarize-button');
+        const summarizeRadio = document.getElementById('task-summarize');
+        const translateRadio = document.getElementById('task-translate');
+        const actionButton = document.getElementById('action-button');
         const statusMessage = document.getElementById('status-message');
-        const summaryCard = document.getElementById('summary-card');
-        const summaryContent = document.getElementById('summary-content');
+        const resultCard = document.getElementById('result-card');
+        const resultTitle = document.getElementById('result-title');
+        const resultContent = document.getElementById('result-content');
         const fileNameDisplay = document.getElementById('file-name');
         
         const messageBox = document.getElementById('message-box');
         const messageText = document.getElementById('message-text');
 
         let file = null;
+        let currentTask = 'summarize';
         const MAX_FILE_SIZE_MB = 5;
 
         // Utility function to show a custom message box
@@ -97,64 +113,85 @@
             }, 300);
         }
 
+        // Handle task selection
+        summarizeRadio.addEventListener('change', () => {
+            currentTask = 'summarize';
+            actionButton.textContent = 'PDF Sankshepikaran Garnuhos';
+            resultTitle.textContent = 'Sankshepikaran:';
+            updateStatus();
+        });
+
+        translateRadio.addEventListener('change', () => {
+            currentTask = 'translate';
+            actionButton.textContent = 'PDF Anubad Garnuhos';
+            resultTitle.textContent = 'Anubad:';
+            updateStatus();
+        });
+
+        function updateStatus() {
+            statusMessage.textContent = file ? `Ready to ${currentTask === 'summarize' ? 'summarize' : 'translate'} "${file.name}"` : 'File chhanot garnuhos.';
+        }
+
         // Handle file selection
         fileInput.addEventListener('change', (e) => {
             const uploadedFile = e.target.files[0];
             if (uploadedFile) {
                 if (uploadedFile.type !== 'application/pdf') {
-                    showMessageBox('Please select a valid PDF file.');
-                    fileInput.value = ''; // Clear file input
+                    showMessageBox('Kripaya sahi PDF file chhanot garnuhos.');
+                    fileInput.value = '';
                     return;
                 }
                 if (uploadedFile.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
-                    showMessageBox(`File size exceeds the maximum limit of ${MAX_FILE_SIZE_MB}MB.`);
-                    fileInput.value = ''; // Clear file input
+                    showMessageBox(`File ko size ${MAX_FILE_SIZE_MB}MB bhanda badi chha.`);
+                    fileInput.value = '';
                     return;
                 }
                 file = uploadedFile;
-                fileNameDisplay.textContent = `Selected file: ${file.name}`;
+                fileNameDisplay.textContent = `Chhanot gareko file: ${file.name}`;
                 fileNameDisplay.classList.remove('hidden');
-                summarizeButton.disabled = false;
+                actionButton.disabled = false;
+                updateStatus();
             } else {
                 file = null;
                 fileNameDisplay.classList.add('hidden');
-                summarizeButton.disabled = true;
+                actionButton.disabled = true;
+                updateStatus();
             }
         });
 
-        // Main summarization logic
-        summarizeButton.addEventListener('click', async () => {
+        // Main logic
+        actionButton.addEventListener('click', async () => {
             if (!file) {
-                showMessageBox('Please select a PDF file first.');
+                showMessageBox('Pahile PDF file chhanot garnuhos.');
                 return;
             }
 
-            summarizeButton.disabled = true;
-            statusMessage.textContent = 'Reading and extracting text from PDF...';
-            summaryCard.classList.add('hidden');
-            summaryContent.textContent = '';
+            actionButton.disabled = true;
+            statusMessage.textContent = 'PDF bata text nikalindai chha...';
+            resultCard.classList.add('hidden');
+            resultContent.textContent = '';
 
             try {
                 const text = await extractTextFromPdf(file);
                 if (!text || text.trim().length === 0) {
-                    statusMessage.textContent = 'Failed to extract text. The PDF might contain images or be corrupted.';
-                    summarizeButton.disabled = false;
+                    statusMessage.textContent = 'Text nikalna sakiyena. PDF ma images matra hunna sakchhan.';
+                    actionButton.disabled = false;
                     return;
                 }
 
-                statusMessage.textContent = 'Text extracted. Sending to LLM for summarization...';
-                const summary = await getSummaryFromLLM(text);
+                statusMessage.textContent = 'Text nikalaiyo. LLM ma pathaudaichha...';
+                const result = await performLLMTask(text, currentTask);
 
-                statusMessage.textContent = 'Summarization complete!';
-                summaryContent.textContent = summary;
-                summaryCard.classList.remove('hidden');
+                statusMessage.textContent = `${currentTask === 'summarize' ? 'Sankshepikaran' : 'Anubad'} pura bhayo!`;
+                resultContent.textContent = result;
+                resultCard.classList.remove('hidden');
 
             } catch (error) {
                 console.error('An error occurred:', error);
-                statusMessage.textContent = 'An error occurred during summarization. Please try again.';
-                showMessageBox('An error occurred. Check the console for details.');
+                statusMessage.textContent = `${currentTask === 'summarize' ? 'Sankshepikaran' : 'Anubad'} garna kehi samasya aayo. Kripaya feri prayas garnuhos.`;
+                showMessageBox('Kehi samasya aayo. Console ma error hera.');
             } finally {
-                summarizeButton.disabled = false;
+                actionButton.disabled = false;
             }
         });
 
@@ -182,14 +219,23 @@
             });
         }
 
-        // Function to call the LLM API for summarization via a serverless function
-        async function getSummaryFromLLM(text) {
+        // Function to call the LLM API for summarization or translation via a serverless function
+        async function performLLMTask(text, task) {
+            let prompt;
+            if (task === 'summarize') {
+                prompt = `Please provide a concise and well-structured summary of the following text:\n\n${text}`;
+            } else if (task === 'translate') {
+                prompt = `Please translate the following text into grammatically correct Nepali. The text can be in English or Nepali, and it should be converted to Nepali:\n\n${text}`;
+            } else {
+                throw new Error('Invalid task selected.');
+            }
+
             let response;
             try {
                 response = await fetch('/api/summarize', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ text })
+                    body: JSON.stringify({ text: prompt })
                 });
 
                 if (!response.ok) {
@@ -201,13 +247,13 @@
             }
 
             const result = await response.json();
-            const summary = result?.summary;
+            const resultText = result?.summary;
 
-            if (!summary) {
-                throw new Error('Summary not found in API response.');
+            if (!resultText) {
+                throw new Error('API response empty or invalid.');
             }
 
-            return summary;
+            return resultText;
         }
 
         // Enable drag and drop functionality
