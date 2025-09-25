@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Summarizer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+        .container {
+            max-width: 800px;
+        }
+        .summary-container {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen p-4">
+
+    <div class="container bg-white p-8 rounded-2xl shadow-lg w-full">
+        <h1 class="text-3xl font-bold text-center text-gray-800 mb-6">PDF Summarizer</h1>
+        <p class="text-center text-gray-500 mb-8">Select a PDF file to generate a concise summary of its content.</p>
+
+        <!-- File Upload Section -->
+        <div class="flex items-center justify-center w-full mb-6">
+            <label for="pdf-upload" class="flex flex-col items-center justify-center w-full h-48 border-2 border-gray-300 border-dashed rounded-xl cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors duration-200">
+                <div class="flex flex-col items-center justify-center pt-5 pb-6">
+                    <svg class="w-8 h-8 mb-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-4-4v-1a4 4 0 014-4h10a4 4 0 014 4v1a4 4 0 01-4 4M12 16v-6m-3 3l3-3m0 0l3 3"></path>
+                    </svg>
+                    <p class="mb-2 text-sm text-gray-500"><span class="font-semibold">Click to upload</span> or drag and drop</p>
+                    <p class="text-xs text-gray-500">Only PDF files (Max 5MB)</p>
+                </div>
+                <input id="pdf-upload" type="file" class="hidden" accept=".pdf" />
+            </label>
+        </div>
+
+        <div id="file-name" class="text-center text-sm text-gray-600 mb-4 hidden"></div>
+
+        <!-- Action Button and Status -->
+        <button id="summarize-button" class="w-full py-3 bg-blue-600 text-white font-medium rounded-xl shadow-md hover:bg-blue-700 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed">
+            Summarize PDF
+        </button>
+
+        <div id="status-message" class="text-center mt-4 text-sm text-gray-700"></div>
+
+        <!-- Summary Display Section -->
+        <div id="summary-card" class="mt-8 p-6 bg-gray-50 rounded-xl hidden">
+            <h3 class="text-lg font-semibold text-gray-800 mb-2">Summary:</h3>
+            <div id="summary-content" class="text-gray-700 leading-relaxed summary-container"></div>
+        </div>
+
+        <!-- Custom Message Box -->
+        <div id="message-box" class="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white p-6 rounded-2xl shadow-xl border border-gray-200 z-50 transition-opacity duration-300 hidden">
+            <div id="message-text" class="text-center text-gray-800 font-medium"></div>
+            <button onclick="closeMessageBox()" class="mt-4 w-full py-2 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 transition-colors duration-200">OK</button>
+        </div>
+
+    </div>
+
+    <!-- PDF.js library to parse PDF files -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+
+    <script>
+        // Set up the PDF.js worker
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+        const fileInput = document.getElementById('pdf-upload');
+        const summarizeButton = document.getElementById('summarize-button');
+        const statusMessage = document.getElementById('status-message');
+        const summaryCard = document.getElementById('summary-card');
+        const summaryContent = document.getElementById('summary-content');
+        const fileNameDisplay = document.getElementById('file-name');
+        
+        const messageBox = document.getElementById('message-box');
+        const messageText = document.getElementById('message-text');
+
+        let file = null;
+        const MAX_FILE_SIZE_MB = 5;
+
+        // API configuration
+        const apiKey = "";
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+
+        // Utility function to show a custom message box
+        function showMessageBox(message) {
+            messageText.textContent = message;
+            messageBox.classList.remove('hidden');
+            messageBox.style.opacity = '1';
+        }
+
+        function closeMessageBox() {
+            messageBox.style.opacity = '0';
+            setTimeout(() => {
+                messageBox.classList.add('hidden');
+            }, 300);
+        }
+
+        // Handle file selection
+        fileInput.addEventListener('change', (e) => {
+            const uploadedFile = e.target.files[0];
+            if (uploadedFile) {
+                if (uploadedFile.type !== 'application/pdf') {
+                    showMessageBox('Please select a valid PDF file.');
+                    fileInput.value = ''; // Clear file input
+                    return;
+                }
+                if (uploadedFile.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
+                    showMessageBox(`File size exceeds the maximum limit of ${MAX_FILE_SIZE_MB}MB.`);
+                    fileInput.value = ''; // Clear file input
+                    return;
+                }
+                file = uploadedFile;
+                fileNameDisplay.textContent = `Selected file: ${file.name}`;
+                fileNameDisplay.classList.remove('hidden');
+                summarizeButton.disabled = false;
+            } else {
+                file = null;
+                fileNameDisplay.classList.add('hidden');
+                summarizeButton.disabled = true;
+            }
+        });
+
+        // Main summarization logic
+        summarizeButton.addEventListener('click', async () => {
+            if (!file) {
+                showMessageBox('Please select a PDF file first.');
+                return;
+            }
+
+            summarizeButton.disabled = true;
+            statusMessage.textContent = 'Reading and extracting text from PDF...';
+            summaryCard.classList.add('hidden');
+            summaryContent.textContent = '';
+
+            try {
+                const text = await extractTextFromPdf(file);
+                if (!text || text.trim().length === 0) {
+                    statusMessage.textContent = 'Failed to extract text. The PDF might contain images or be corrupted.';
+                    summarizeButton.disabled = false;
+                    return;
+                }
+
+                statusMessage.textContent = 'Text extracted. Sending to LLM for summarization...';
+                const summary = await getSummaryFromLLM(text);
+
+                statusMessage.textContent = 'Summarization complete!';
+                summaryContent.textContent = summary;
+                summaryCard.classList.remove('hidden');
+
+            } catch (error) {
+                console.error('An error occurred:', error);
+                statusMessage.textContent = 'An error occurred during summarization. Please try again.';
+                showMessageBox('An error occurred. Check the console for details.');
+            } finally {
+                summarizeButton.disabled = false;
+            }
+        });
+
+        // Function to extract text from PDF using PDF.js
+        async function extractTextFromPdf(pdfFile) {
+            const fileReader = new FileReader();
+            return new Promise((resolve, reject) => {
+                fileReader.onload = async () => {
+                    const typedarray = new Uint8Array(fileReader.result);
+                    try {
+                        const pdf = await pdfjsLib.getDocument({ data: typedarray }).promise;
+                        let fullText = '';
+                        for (let i = 1; i <= pdf.numPages; i++) {
+                            const page = await pdf.getPage(i);
+                            const textContent = await page.getTextContent();
+                            fullText += textContent.items.map(item => item.str).join(' ');
+                        }
+                        resolve(fullText);
+                    } catch (error) {
+                        reject(error);
+                    }
+                };
+                fileReader.onerror = reject;
+                fileReader.readAsArrayBuffer(pdfFile);
+            });
+        }
+
+        // Function to call the LLM API for summarization
+        async function getSummaryFromLLM(text) {
+            const payload = {
+                contents: [{
+                    parts: [{
+                        text: `Please provide a concise and well-structured summary of the following text:\n\n${text}`
+                    }]
+                }]
+            };
+
+            let response;
+            try {
+                // Using exponential backoff for API calls
+                let delay = 1000;
+                for (let i = 0; i < 3; i++) {
+                    try {
+                        response = await fetch(apiUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+                        if (response.ok) break;
+                    } catch (e) {
+                        console.error(`Attempt ${i + 1} failed, retrying...`, e);
+                    }
+                    await new Promise(res => setTimeout(res, delay));
+                    delay *= 2;
+                }
+                if (!response || !response.ok) {
+                    throw new Error('API call failed after multiple retries.');
+                }
+            } catch (error) {
+                console.error('API call failed:', error);
+                throw error;
+            }
+
+            const result = await response.json();
+            const summary = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+            if (!summary) {
+                throw new Error('Summary not found in API response.');
+            }
+
+            return summary;
+        }
+
+        // Enable drag and drop functionality
+        const dropZone = document.querySelector('label[for="pdf-upload"]');
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            dropZone.classList.add('border-blue-600');
+        });
+        dropZone.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            dropZone.classList.remove('border-blue-600');
+        });
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            dropZone.classList.remove('border-blue-600');
+            fileInput.files = e.dataTransfer.files;
+            fileInput.dispatchEvent(new Event('change'));
+        });
+
+    </script>
+</body>
+</html>
